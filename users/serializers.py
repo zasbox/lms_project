@@ -7,7 +7,17 @@ from users.models import User
 class PaymentSerializer(ModelSerializer):
     class Meta:
         model = Payment
-        fields = ['id', 'user', 'date', 'amount', 'method', 'course', 'lesson']
+        fields = '__all__'
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        return {key: value for key, value in representation.items() if value is not None}
+
+
+class PaymentForUserSerializer(ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['date', 'amount', 'method', 'course', 'lesson']
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -15,7 +25,7 @@ class PaymentSerializer(ModelSerializer):
 
 
 class UserSerializer(ModelSerializer):
-    payments = PaymentSerializer(source='payment_set', many=True)
+    payments = PaymentForUserSerializer(source='payment_set', many=True)
 
     class Meta:
         model = User
