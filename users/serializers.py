@@ -29,4 +29,12 @@ class UserSerializer(ModelSerializer):
 
     class Meta:
         model = User
+        partial = True
         fields = ['id', 'last_name', 'first_name', 'middle_name', 'email', 'phone_number', 'location', 'avatar', 'payments']
+
+
+class IsNotOwnerUserSerializer(ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'middle_name', 'email', 'phone_number', 'location', 'avatar']
