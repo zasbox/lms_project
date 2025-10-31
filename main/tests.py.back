@@ -1,0 +1,164 @@
+from django.contrib.auth.models import Group
+from rest_framework import status, serializers
+from rest_framework.test import APITestCase
+
+from main.models import Lesson, Course, Subscription
+from users.models import User
+
+
+class LessonTestCase(APITestCase):
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(last_name="Федоров",
+                                             first_name="Федор",
+                                             middle_name="Иванович",
+                                             email="fedorov@mail.ru",
+                                             phone_number="+79605837382",
+                                             location="Москва",
+                                             password="12345")
+
+        self.client.force_authenticate(user=self.user)
+
+    def tearDown(self):
+        pass
+
+    def test_create_lesson(self):
+        """Тестирование создания урока"""
+        lesson = {
+            'name': 'Экономика',
+            'description': 'Экономическая теория',
+            'video_url': 'http://youtube.com/eco'
+        }
+        response = self.client.post('/lessons/create', data=lesson, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.assertTrue(Lesson.objects.filter(name='Экономика').exists())
+
+        self.assertEqual(response.json(), {'id': 1, 'name': 'Экономика', 'description': 'Экономическая теория',
+                                           'preview': None, 'video_url': 'http://youtube.com/eco', 'course': None,
+                                           'owner': None}
+                         )
+
+    def test_update_lesson_by_not_moderator(self):
+        """Тестирование обновления урока не модератором"""
+        l = Lesson.objects.create(
+            name='Экономика',
+            description='Экономическая теория',
+            video_url='http://youtube.com/eco'
+        )
+        lesson = {
+            'name': 'Основы Python',
+            'description': 'Основы языка python',
+            'video_url': 'http://youtube.com/py'
+        }
+        response = self.client.put(f'/lessons/{l.pk}/update', data=lesson, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_update_lesson_by_moderator(self):
+        """Тестирование обновления урока модератором"""
+        group = Group.objects.create(name='moderator')
+        group.user_set.add(self.user)
+
+        l = Lesson.objects.create(
+            name='Экономика',
+            description='Экономическая теория',
+            video_url='http://youtube.com/eco'
+        )
+        lesson = {
+            'name': 'Основы Python',
+            'description': 'Основы языка python',
+            'video_url': 'http://youtube.com/py'
+        }
+
+        response = self.client.put(f'/lessons/{l.pk}/update', data=lesson, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_list_lesson(self):
+        """Тестирование получения списка уроков"""
+        Lesson.objects.create(
+            name='Экономика',
+            description='Экономическая теория',
+            video_url='http://youtube.com/eco'
+        )
+        Lesson.objects.create(
+            name='Основы Python',
+            description='Основы языка python',
+            video_url='http://youtube.com/py'
+        )
+        response = self.client.get('/lessons/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_lesson_by_moderator(self):
+        """Тестирование получения одного урока модератором"""
+        group = Group.objects.create(name='moderator')
+        group.user_set.add(self.user)
+
+        l = Lesson.objects.create(
+            name='Экономика',
+            description='Экономическая теория',
+            video_url='http://youtube.com/eco'
+        )
+        Lesson.objects.create(
+            name='Основы Python',
+            description='Основы языка python',
+            video_url='http://youtube.com/py'
+        )
+
+        response = self.client.get(f'/lessons/{l.pk}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_delete_lesson(self):
+        """Тестирование удаления урока"""
+        l = Lesson.objects.create(
+            name='Экономика',
+            description='Экономическая теория',
+            video_url='http://youtube.com/eco'
+        )
+        Lesson.objects.create(
+            name='Основы Python',
+            description='Основы языка python',
+            video_url='http://youtube.com/py'
+        )
+        response = self.client.delete(f'/lessons/{l.pk}/delete')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class CourseTestCase(APITestCase):
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(last_name="Федоров",
+                                             first_name="Федор",
+                                             middle_name="Иванович",
+                                             email="fedorov@mail.ru",
+                                             phone_number="+79605837382",
+                                             location="Москва",
+                                             password="12345")
+
+        self.client.force_authenticate(user=self.user)
+
+        Lesson.objects.create(
+            name='Экономика',
+            description='Экономическая теория',
+            video_url='http://youtube.com/eco'
+        )
+        Lesson.objects.create(
+            name='Основы Python',
+            description='Основы языка python',
+            video_url='http://youtube.com/py'
+        )
+        Course.objects.create(
+            name="Программирование на языке python",
+            description="Экспресс курс языка python"
+        )
+
+    def tearDown(self) -> None:
+        pass
+
+    def test_subscribe(self):
+        data = {'course': 1}
+        response = self.client.post('/courses/subscribe', data=data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['is_signed'], True)
+
+        response = self.client.post('/courses/subscribe', data=data, format='json')
+        self.assertEqual(response.data['is_signed'], False)

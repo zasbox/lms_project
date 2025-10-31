@@ -28,7 +28,7 @@ class Lesson(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='Автор', **NULLABLE)
 
     def __str__(self):
-        return f'{self.name} ({self.course.name})'
+        return f'{self.name}'
 
     class Meta:
         verbose_name = 'Урок'
@@ -50,3 +50,19 @@ class Payment(models.Model):
     class Meta:
         verbose_name = 'Платеж'
         verbose_name_plural = 'Платежи'
+
+
+class Subscription(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, verbose_name="Курс")
+    is_signed = models.BooleanField(default=True, verbose_name="Подписан")
+
+    def __str__(self):
+        return f'{self.user} {self.course} {self.is_signed}'
+
+    class Meta:
+        verbose_name = "Подписка"
+        verbose_name_plural = "Подписки"
+        unique_together = ('user', 'course')
+
+
