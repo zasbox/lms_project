@@ -2,12 +2,14 @@ from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, UpdateAPIView, DestroyAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
-from main.models import Course, Lesson, Subscription
+from main.models import Course, Lesson, Subscription, Payment
 from main.paginators import CoursePaginator, LessonPaginator
 from main.permissions import IsModerator, IsOwner
 from main.serializers import CourseSerializer, LessonSerializer, SubscriptionSerializer
+from main.services import make_payment, get_status_payment
 
 
 class CourseViewSet(ModelViewSet):
@@ -79,3 +81,44 @@ class SubscriptionCreateAPIView(CreateAPIView):
         serializer.save()
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class PaymentCreateAPIView(APIView):
+    serializer_class = LessonSerializer
+    queryset = Lesson.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        course_id = request.data.get('course')
+        user = request.user
+        course = Course.objects.get(pk=course_id)
+        session, url = make_payment(course.name, course.price).values()
+        Payment.objects.create(user=user, course=course, amount=course.price, method='ACCOUNT', payment_session=session)
+        return Response({'status': 'OK', 'url': url}, status=status.HTTP_201_CREATED)
+
+
+class PaymentRealizedAPIView(APIView):
+    serializer_class = LessonSerializer
+    queryset = Lesson.objects.all()
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        session_id = kwargs.get('session_id')
+        payment = Payment.objects.get(payment_session=session_id)
+        payment.is_paid = True
+        payment.save()
+        return Response({'status': 'paid'}, status=status.HTTP_200_OK)
+
+
+class PaymentStatusAPIView(APIView):
+    serializer_class = LessonSerializer
+    queryset = Lesson.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        session_id = kwargs.get('session_id')
+        data = get_status_payment(session_id)
+        return Response({'status': data}, status=status.HTTP_200_OK)
+
+
+
