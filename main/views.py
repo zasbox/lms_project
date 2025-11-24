@@ -1,3 +1,7 @@
+
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, UpdateAPIView, DestroyAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -10,6 +14,7 @@ from main.paginators import CoursePaginator, LessonPaginator
 from main.permissions import IsModerator, IsOwner
 from main.serializers import CourseSerializer, LessonSerializer, SubscriptionSerializer
 from main.services import make_payment, get_status_payment
+from main.tasks import send_email_about_updating_course
 
 
 class CourseViewSet(ModelViewSet):
@@ -30,6 +35,10 @@ class CourseViewSet(ModelViewSet):
         context = super().get_serializer_context()
         context['user'] = self.request.user
         return context
+
+    def perform_update(self, serializer):
+        course = serializer.save()
+        send_email_about_updating_course(course)
 
 
 class LessonListAPIView(ListAPIView):
@@ -56,11 +65,16 @@ class LessonUpdateAPIView(UpdateAPIView):
     queryset = Lesson.objects.all()
     permission_classes = [IsAuthenticated, IsOwner | IsModerator]
 
+    def perform_update(self, serializer):
+        lesson = serializer.save()
+        if timezone.now() - timedelta(hours=4) > lesson.course.updated_at:
+            send_email_about_updating_course(lesson.course)
+
 
 class LessonDestroyAPIView(DestroyAPIView):
     serializer_class = LessonSerializer
     queryset = Lesson.objects.all()
-    # permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated, IsOwner]
 
 
 class SubscriptionCreateAPIView(CreateAPIView):
@@ -100,6 +114,7 @@ class PaymentCreateAPIView(APIView):
 class PaymentRealizedAPIView(APIView):
     serializer_class = LessonSerializer
     queryset = Lesson.objects.all()
+
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -119,6 +134,3 @@ class PaymentStatusAPIView(APIView):
         session_id = kwargs.get('session_id')
         data = get_status_payment(session_id)
         return Response({'status': data}, status=status.HTTP_200_OK)
-
-
-

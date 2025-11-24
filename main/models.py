@@ -11,6 +11,7 @@ class Course(models.Model):
     description = models.TextField(verbose_name='Описание')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name='Автор', **NULLABLE)
     price = models.PositiveIntegerField(default=85000, verbose_name="Цена")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата и время последнего обновления')
 
     def __str__(self):
         return self.name
@@ -67,5 +68,3 @@ class Subscription(models.Model):
         verbose_name = "Подписка"
         verbose_name_plural = "Подписки"
         unique_together = ('user', 'course')
-
-
